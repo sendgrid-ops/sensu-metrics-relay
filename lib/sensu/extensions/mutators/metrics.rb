@@ -96,6 +96,20 @@ module Sensu::Extension
           mutated = mutator.call(metric)
           @endpoints[ep_name] << mutated
         end
+      elsif output_type == 'nagios'
+        perfdata = String.new
+        raw_hostname = @event[:client][:name]
+        hostname = raw_hostname.gsub('.','_')
+        timestamp = @event[:check][:issued]
+        if /^.*|(.*)$/ =~ output
+          array = output.scan(/[^ ;]+;[\S*;]*/)
+          array.each do |perf|
+            /(?<key>\w+)=(?<value>[\d\.]+)\w*;/ =~ perf
+            name = key.gsub('.','_')
+            perfdata = perfdata + "#{hostname}.#{name}\t#{value}\t#{timestamp}\n"
+          end
+        end
+        @endpoints[ep_name] = perfdata 
       # don't mutate
       elsif output_type == endpoint_name
         @endpoints[ep_name] = output
