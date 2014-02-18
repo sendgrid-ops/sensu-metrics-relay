@@ -98,8 +98,7 @@ module Sensu::Extension
         end
       elsif output_type == 'nagios'
         perfdata = String.new
-        raw_hostname = @event[:client][:name]
-        hostname = raw_hostname.gsub('.','_')
+        hostname = @event[:client][:name]
         timestamp = @event[:check][:issued]
         if /^.*|(.*)$/ =~ output
           array = output.scan(/[^ ;]+;[\S*;]*/)
