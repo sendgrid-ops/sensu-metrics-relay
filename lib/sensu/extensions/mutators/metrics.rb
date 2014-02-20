@@ -70,7 +70,7 @@ module Sensu::Extension
 
       settings[:relay].keys.each do |endpoint_name|
         ep_name = endpoint_name.intern
-        mutator = @mutators[ep_name] || nil
+        mutator = @mutators[ep_name] || next
         mutate(mutator, ep_name)
       end unless settings[:relay].nil? # keys.each
       # if we aren't configured we simply pass nil to the handler which it then
@@ -98,14 +98,24 @@ module Sensu::Extension
         end
       elsif output_type == 'nagios'
         perfdata = String.new
+        checkname = @event[:check][:name]
         hostname = @event[:client][:name]
+        name_array = hostname.split('.')
+        shortname = name_array[0]
+        if /sjc1/ =~ name_array[1]
+          location = 'production_sjc'
+        elsif /sendgrid/ =~ name_array[1]
+          location = 'production_dallas'
+        else
+          location = name_array[1]
+        end
         timestamp = @event[:check][:issued]
         if /^.*|(.*)$/ =~ output
           array = output.scan(/[^ ;]+;[\S*;]*/)
           array.each do |perf|
             /(?<key>\w+)=(?<value>[\d\.]+)\w*;/ =~ perf
             name = key.gsub('.','_')
-            perfdata = perfdata + "#{hostname}.#{name}\t#{value}\t#{timestamp}\n"
+            perfdata = perfdata + "sensu.#{location}.#{shortname}.#{checkname}.#{name}\t#{value}\t#{timestamp}\n"
           end
         end
         @endpoints[ep_name] = perfdata 
