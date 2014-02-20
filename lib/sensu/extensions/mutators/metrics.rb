@@ -70,7 +70,7 @@ module Sensu::Extension
 
       settings[:relay].keys.each do |endpoint_name|
         ep_name = endpoint_name.intern
-        mutator = @mutators[ep_name] || next
+        mutator = @mutators[ep_name] || nil
         mutate(mutator, ep_name)
       end unless settings[:relay].nil? # keys.each
       # if we aren't configured we simply pass nil to the handler which it then
