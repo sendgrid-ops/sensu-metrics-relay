@@ -81,7 +81,7 @@ module Sensu::Extension
     def mutate(mutator, ep_name)
       logger.debug("metrics.run mutating for #{ep_name.inspect}")
       check = @event[:check]
-      output = check[:output]
+      output = check[:output].chomp
       output_type = check[:output_type]
       endpoint_name = ep_name.to_s
 
