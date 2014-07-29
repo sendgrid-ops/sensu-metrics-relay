@@ -41,7 +41,7 @@ module Sensu::Extension
       @is_closed = false
       @connection_attempt_count = 0
       @max_reconnect_time = MAX_RECONNECT_TIME
-      @comm_inactivity_timeout = 0 # disable inactivity timeout
+      @comm_inactivity_timeout = 5 # reconnect after 5 idle seconds
       @pending_connect_timeout = 30 # seconds
       @reconnect_timer = ExponentialDecayTimer.new
     end
@@ -58,6 +58,12 @@ module Sensu::Extension
 
     def comm_inactivity_timeout
       logger.info("Connection to #{@name} timed out.")
+      schedule_reconnect
+    end
+
+    def timed_reconnect
+      logger.info("Reconnecting to #{@name} to keep connection fresh.")
+      @connected = false
       schedule_reconnect
     end
 
@@ -152,6 +158,7 @@ module Sensu::Extension
         if queue_length >= MAX_QUEUE_SIZE
           flush_to_net
           Sensu::Logger.get.debug('relay.flush_to_net: successfully flushed to network')
+          timed_reconnect
         end
       end
     end
