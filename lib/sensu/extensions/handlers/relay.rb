@@ -61,12 +61,6 @@ module Sensu::Extension
       schedule_reconnect
     end
 
-    def timed_reconnect
-      logger.info("Reconnecting to #{@name} to keep connection fresh.")
-      @connected = false
-      schedule_reconnect
-    end
-
     def unbind
       @connected = false
       unless @is_closed
@@ -98,6 +92,13 @@ module Sensu::Extension
         @max_reconnect_time,
         @connection_attempt_count
       )
+    end
+
+    def flush_connection
+      close_connection_after_writing
+      unbind
+      logger.info("Flushing connection to #{@name}.")
+      schedule_reconnect
     end
 
     def schedule_reconnect
@@ -139,6 +140,9 @@ module Sensu::Extension
       EventMachine::PeriodicTimer.new(60) do
         Sensu::Logger.get.info("relay queue size for #{name}: #{queue_length}")
       end
+      EventMachine::PeriodicTimer.new(60) do # reset the connection every 60 seconds to help with load balancing distribution
+        @connection.flush_connection
+      end
     end
 
     def queue_length
@@ -158,7 +162,6 @@ module Sensu::Extension
         if queue_length >= MAX_QUEUE_SIZE
           flush_to_net
           Sensu::Logger.get.debug('relay.flush_to_net: successfully flushed to network')
-          timed_reconnect
         end
       end
     end
