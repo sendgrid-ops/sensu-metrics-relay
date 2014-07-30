@@ -41,7 +41,7 @@ module Sensu::Extension
       @is_closed = false
       @connection_attempt_count = 0
       @max_reconnect_time = MAX_RECONNECT_TIME
-      @comm_inactivity_timeout = 0 # disable inactivity timeout
+      @comm_inactivity_timeout = 5 # reconnect after 5 idle seconds
       @pending_connect_timeout = 30 # seconds
       @reconnect_timer = ExponentialDecayTimer.new
     end
@@ -73,6 +73,11 @@ module Sensu::Extension
       super(*args)
     end
 
+    # Override EM::Connection.receive_data to prevent it from calling
+    # puts and randomly logging non-sense to sensu-server.log
+    def receive_data(data)
+    end
+
     # Reconnect normally attempts to connect at the end of the tick
     # Delay the reconnect for some seconds.
     def reconnect(time)
@@ -87,6 +92,13 @@ module Sensu::Extension
         @max_reconnect_time,
         @connection_attempt_count
       )
+    end
+
+    def flush_connection
+      close_connection_after_writing
+      unbind
+      logger.info("Flushing connection to #{@name}.")
+      schedule_reconnect
     end
 
     def schedule_reconnect
@@ -127,6 +139,9 @@ module Sensu::Extension
       @connection.message_queue = @queue
       EventMachine::PeriodicTimer.new(60) do
         Sensu::Logger.get.info("relay queue size for #{name}: #{queue_length}")
+      end
+      EventMachine::PeriodicTimer.new(60) do # reset the connection every 60 seconds to help with load balancing distribution
+        @connection.flush_connection
       end
     end
 
@@ -220,7 +235,7 @@ module Sensu::Extension
       @endpoints.each_value do |ep|
         ep.stop
       end
-      yield
+      yield if block_given?
     end
 
     def logger
