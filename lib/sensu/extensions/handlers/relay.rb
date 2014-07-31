@@ -41,7 +41,7 @@ module Sensu::Extension
       @is_closed = false
       @connection_attempt_count = 0
       @max_reconnect_time = MAX_RECONNECT_TIME
-      @comm_inactivity_timeout = 5 # reconnect after 5 idle seconds
+      @comm_inactivity_timeout = 0 # disable inactivity timeout
       @pending_connect_timeout = 30 # seconds
       @reconnect_timer = ExponentialDecayTimer.new
     end
@@ -94,13 +94,6 @@ module Sensu::Extension
       )
     end
 
-    def flush_connection
-      close_connection_after_writing
-      unbind
-      logger.info("Flushing connection to #{@name}.")
-      schedule_reconnect
-    end
-
     def schedule_reconnect
       unless @connected
         @connection_attempt_count += 1
@@ -139,9 +132,6 @@ module Sensu::Extension
       @connection.message_queue = @queue
       EventMachine::PeriodicTimer.new(60) do
         Sensu::Logger.get.info("relay queue size for #{name}: #{queue_length}")
-      end
-      EventMachine::PeriodicTimer.new(60) do # reset the connection every 60 seconds to help with load balancing distribution
-        @connection.flush_connection
       end
     end
 
@@ -187,6 +177,7 @@ module Sensu::Extension
       super
       @endpoints = { }
       @initialized = false
+      @counter = 0
     end
 
     # ignore :reek:LongMethod
@@ -199,6 +190,7 @@ module Sensu::Extension
           ep_settings['host'],
           ep_settings['port']
         )
+      @counter = 0
       end
     end
 
@@ -222,8 +214,14 @@ module Sensu::Extension
     def run(event_data)
       begin
         event_data.keys.each do |ep_name|
+          if @counter > 16384
+            logger.debug("relay.run() recycling connection")
+            stop
+            post_init
+          end
           logger.debug("relay.run() handling endpoint: #{ep_name}")
           @endpoints[ep_name].relay_event(event_data[ep_name]) unless event_data[ep_name].empty?
+          @counter += 1
         end
       rescue => error
         yield(error.to_s, 2)
