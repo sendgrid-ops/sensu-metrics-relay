@@ -221,6 +221,7 @@ module Sensu::Extension
           end
           logger.debug("relay.run() handling endpoint: #{ep_name}")
           @endpoints[ep_name].relay_event(event_data[ep_name]) unless event_data[ep_name].empty?
+          @counter += 1
         end
       rescue => error
         yield(error.to_s, 2)
