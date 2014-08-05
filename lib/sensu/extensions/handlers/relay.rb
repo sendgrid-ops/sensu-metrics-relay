@@ -119,7 +119,7 @@ module Sensu::Extension
     # EM::Connection.send_data batches network connection writes in 16KB
     # We should start out by having all data in the queue flush in the
     # space of a single loop tick.
-    MAX_QUEUE_SIZE = 16384
+    MAX_QUEUE_SIZE = 4096
 
     attr_accessor :connection, :queue
 
@@ -214,7 +214,7 @@ module Sensu::Extension
     def run(event_data)
       begin
         event_data.keys.each do |ep_name|
-          if @counter > 16384
+          if @counter > 4096
             logger.debug("relay.run() recycling connection")
             stop
             post_init
