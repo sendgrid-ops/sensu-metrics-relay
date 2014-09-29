@@ -104,7 +104,7 @@ module Sensu::Extension
         shortname = name_array[0]
         if /sjc1/ =~ name_array[1]
           location = 'production_sjc'
-        elsif /mdw1/ =~ name_array[1]
+        elsif /mdw1/ =~ name_array[0]
           location = 'production_mdw1'
         elsif /sendgrid/ =~ name_array[1]
           location = 'production_dallas'
