@@ -68,23 +68,30 @@ module Sensu::Extension
       # We also assume that people want to auto tag their metrics.
       event[:check][:auto_tag_host] ||= 'yes'
 
-      settings[:relay].keys.each do |endpoint_name|
-        ep_name = endpoint_name.intern
-        mutator = @mutators[ep_name] || nil
-        mutate(mutator, ep_name)
-      end unless settings[:relay].nil? # keys.each
+      
       # if we aren't configured we simply pass nil to the handler which it then
       # guards against. fail silently.
+      unless settings[:relay].nil? 
+        # Stick the defaults in the end since hashes are insert order in Ruby 1.9 or greater
+        config_relay = settings[:relay].select{|k,v| v['default'].nil?}
+        config_relay.merge settings[:relay].select{|k,v| v['default'] == true}
+
+        config_relay.each do |data_center, config|
+          ep_name = data_center.intern
+          mutator = @mutators[ep_name] || nil
+          mutate(mutator, ep_name, config)
+        end # keys.each
+      end
+
       yield(@endpoints, 0)
     end # run
 
-    def mutate(mutator, ep_name)
+    def mutate(mutator, ep_name, endpoint_config)
       logger.debug("metrics.run mutating for #{ep_name.inspect}")
       check = @event[:check]
       output = check[:output].chomp
       output_type = check[:output_type]
       endpoint_name = ep_name.to_s
-
       # if we receive json, we mutate based on the endpoint name
       if output_type == 'json'
         @endpoints[ep_name] = ''
@@ -96,21 +103,25 @@ module Sensu::Extension
           mutated = mutator.call(metric)
           @endpoints[ep_name] << mutated
         end
+
+        #TODO add if statement to bail out?
+
       elsif output_type == 'nagios'
         perfdata = String.new
         checkname = @event[:check][:name]
         hostname = @event[:client][:name]
         name_array = hostname.split('.')
         shortname = name_array[0]
-        if /sjc1/ =~ name_array[1]
-          location = 'production_sjc'
-        elsif /mdw1/ =~ name_array[0]
-          location = 'production_mdw1'
-        elsif /sendgrid/ =~ name_array[1]
-          location = 'production_dallas'
+
+        # Check to see if metric matches endpoint
+        i = endpoint_config['index'] 
+        if /#{ep_name}/ =~ name_array[i] || endpoint_config['default'] # Should only default on last iteration
+          location = endpoint_config['location']
         else
-          location = name_array[1]
+          return nil # GTFO
         end
+
+        # Prepare metric into graphite 
         timestamp = @event[:check][:issued]
         if /^.*|(.*)$/ =~ output
           array = output.scan(/[^ ;]+;[\S*;]*/)
