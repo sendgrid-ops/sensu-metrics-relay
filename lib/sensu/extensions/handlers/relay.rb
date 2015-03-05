@@ -29,8 +29,8 @@ module Sensu::Extension
   class RelayConnectionHandler < EM::Connection
 
     # XXX: These should be runtime configurable.
-    MAX_RECONNECT_ATTEMPTS = 10
-    MAX_RECONNECT_TIME = 300 # seconds
+    MAX_RECONNECT_ATTEMPTS = 0 # Attempt no reconnects. Drop if it can't in favor for speed.
+    MAX_RECONNECT_TIME = 0 # seconds
 
     attr_accessor :message_queue, :connection_pool
     attr_accessor :name, :host, :port, :connected
@@ -159,7 +159,8 @@ module Sensu::Extension
     def stop
       if @connection.connected
         flush_to_net
-        @connection.close_connection_after_writing
+        #@connection.close_connection_after_writing
+        @connection.close_connection # Force connection closing, do not wait.
       end
     end
 
